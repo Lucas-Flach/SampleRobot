@@ -18,7 +18,7 @@ chmod +x ./build/main
 # Run
 ./build/main
   
-# Detele the build
+# Detele the build (os aconselho a sempre rodar esse comando antes do make)
 make clean
 
 # =============== Windows ===============
