@@ -15,7 +15,7 @@ void* ColisionAvoidanceNeuralNetworkThread::runThread(void*)
         myMutex.lock();
         robo->getAllSonar(sonar);
         tratamentoRna();
-        ArUtil::sleep(500); //Esse delay pode ser importante, principalmente dependendo da velocidade do computador em que o codigo estiver rodando, pois pode acabar empilhando muitas acoes para o robo realizar.
+        ArUtil::sleep(50); //Esse delay pode ser importante, principalmente dependendo da velocidade do computador em que o codigo estiver rodando, pois pode acabar empilhando muitas acoes para o robo realizar.
         myMutex.unlock();
     }
 

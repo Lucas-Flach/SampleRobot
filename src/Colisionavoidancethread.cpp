@@ -77,4 +77,4 @@ void ColisionAvoidanceThread::tratamentoSimples()
       }
       else
             std::cout << "Executando rotacao previa \n";
-}
+} 
