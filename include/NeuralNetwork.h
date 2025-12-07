@@ -14,8 +14,7 @@
 
 #define Sucesso 0.01            
 #define NumeroCiclos 200000     
-
-// Mantido 0.2 para estabilidade
+ 
 #define TaxaAprendizado 0.2     
 #define Momentum 0.9            
 #define MaximoPesoInicial 0.5
@@ -64,13 +63,9 @@ public:
     ActivationFunction* activationFunctionCamadaSaida;
 
     float ValoresSensores[1][NodosEntrada] = {{0}};
-
-    // ==================================================================================
-    // 44 EXEMPLOS DE TREINAMENTO (OTIMIZADO PARA SAIR DE QUARTOS)
-    // ==================================================================================
-    const float Input[PadroesTreinamento][NodosEntrada] = {
-        // --- G1: FRENTE / SAÍDA DE QUARTO (12 Exemplos) ---
-        // A lógica aqui mudou: Se 3 e 4 (centro) estão livres (5000), IGNORE as laterais distantes.
+ 
+    // 44 EXEMPLOS DE TREINAMENTO
+    const float Input[PadroesTreinamento][NodosEntrada] = { 
         
         {5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, // 01 - Espaço Aberto Perfeito
         {3000, 5000, 5000, 5000, 5000, 5000, 5000, 3000}, // 02 - Corredor Largo
@@ -80,16 +75,14 @@ public:
         {4000, 4000, 5000, 5000, 5000, 5000, 4000, 4000}, // 06 - Sala ampla
         { 700,  700, 5000, 5000, 5000, 5000,  900,  900}, // 07 - Leve desalinho (mas frente livre)
         { 900,  900, 5000, 5000, 5000, 5000,  700,  700}, // 08 - Leve desalinho (mas frente livre)
-        
-        // --- AQUI ESTÁ O SEGREDO PARA SAIR DE QUARTOS (Substituímos os repetidos) ---
-        // Cenário: "Funil". Laterais detectam paredes (2000/3000), mas FRENTE é 5000.
+          
         // Ação: FRENTE. O robô aprende a focar nos sensores centrais para decisão de avançar.
         {2000, 2000, 4000, 5000, 5000, 4000, 2000, 2000}, // 09 - Quarto afunilando
         {1500, 3000, 5000, 5000, 5000, 5000, 3000, 1500}, // 10 - Passando por uma porta/fresta
         {5000, 2500, 5000, 5000, 5000, 5000, 2500, 5000}, // 11 - Obstáculos laterais médios
         {3000, 3000, 3000, 5000, 5000, 3000, 3000, 3000}, // 12 - Sala pequena, saída à frente
 
-        // --- G2: OBSTÁCULO ESQUERDA -> VIRAR DIREITA (12 Exemplos Fortes) ---
+        // --- G2: OBSTÁCULO ESQUERDA -> VIRAR DIREITA---
         { 400, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, // 13
         { 500,  500, 5000, 5000, 5000, 5000, 5000, 5000}, // 14
         {5000, 5000,  400,  400, 5000, 5000, 5000, 5000}, // 15
@@ -103,7 +96,7 @@ public:
         {5000, 5000,  500,  500, 5000, 5000, 5000, 5000}, // 23
         {1000, 1000, 5000, 5000, 5000, 5000, 5000, 5000}, // 24
 
-        // --- G3: OBSTÁCULO DIREITA -> VIRAR ESQUERDA (12 Exemplos Fortes) ---
+        // --- G3: OBSTÁCULO DIREITA -> VIRAR ESQUERDA---
         {5000, 5000, 5000, 5000, 5000, 5000, 5000,  400}, // 25
         {5000, 5000, 5000, 5000, 5000, 5000,  500,  500}, // 26
         {5000, 5000, 5000, 5000,  400,  400, 5000, 5000}, // 27
@@ -120,14 +113,14 @@ public:
         {5000, 5000, 5000, 5000,  500,  500, 5000, 5000}, // 35
         {5000, 5000, 5000, 5000, 5000, 5000, 1000, 1000}, // 36
 
-        // --- G4: CORREÇÕES SUAVES DIREITA (4 Exemplos) ---
+        // --- G4: CORREÇÕES SUAVES DIREITA---
         // Aqui o robô aprende: "Se um lado está meio perto, mas a frente está livre, corrija suave"
         {2500, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, // 37
         {2500, 2500, 5000, 5000, 5000, 5000, 5000, 5000}, // 38
         {2200, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, // 39
         {3000, 3000, 5000, 5000, 5000, 5000, 5000, 5000}, // 40
 
-        // --- G5: CORREÇÕES SUAVES ESQUERDA (4 Exemplos) ---
+        // --- G5: CORREÇÕES SUAVES ESQUERDA---
         {5000, 5000, 5000, 5000, 5000, 5000, 5000, 2500}, // 41
         {5000, 5000, 5000, 5000, 5000, 5000, 2500, 2500}, // 42
         {5000, 5000, 5000, 5000, 5000, 5000, 5000, 2200}, // 43
@@ -135,10 +128,7 @@ public:
     };
     
     float InputNormalizado[PadroesTreinamento][NodosEntrada];
-
-    // ==================================================================================
-    // OBJETIVOS (Mantidos iguais, pois só mudamos a qualidade dos Inputs de G1)
-    // ==================================================================================
+ 
     const float Objetivo[PadroesTreinamento][NodosSaida] = {
         // G1: FRENTE (1-12) - Agora inclui saida de quartos
         {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
@@ -194,23 +184,19 @@ public:
         {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE},
         {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE}
     };
-    
-    // --- MANTIVE A VALIDAÇÃO IGUAL AO INPUT PARA GARANTIR CONSISTÊNCIA ---
-    // (Em implementações avançadas poderiam ser diferentes, mas aqui garante que 
-    // a rede aprendeu exatamente o que ensinamos)
+      
     const float InputValidacao[PadroesValidacao][NodosEntrada] = {
         {5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, {3000, 5000, 5000, 5000, 5000, 5000, 5000, 3000},
         { 800,  800, 5000, 5000, 5000, 5000,  800,  800}, { 600,  600, 5000, 5000, 5000, 5000,  600,  600},
         {1000, 5000, 5000, 5000, 5000, 5000, 5000, 1000}, {4000, 4000, 5000, 5000, 5000, 5000, 4000, 4000},
         { 700,  700, 5000, 5000, 5000, 5000,  900,  900}, { 900,  900, 5000, 5000, 5000, 5000,  700,  700},
         
-        // Novos padrões de validação (saída de quarto)
+        // (saída de quarto)
         {2000, 2000, 4000, 5000, 5000, 4000, 2000, 2000}, 
         {1500, 3000, 5000, 5000, 5000, 5000, 3000, 1500},
         {5000, 2500, 5000, 5000, 5000, 5000, 2500, 5000}, 
         {3000, 3000, 3000, 5000, 5000, 3000, 3000, 3000},
-
-        // Restante permanece igual (copia do Input acima)
+ 
         { 400, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, { 500,  500, 5000, 5000, 5000, 5000, 5000, 5000},
         {5000, 5000,  400,  400, 5000, 5000, 5000, 5000}, { 800,  800,  800, 5000, 5000, 5000, 5000, 5000},
         { 300, 5000, 5000, 5000, 5000, 5000, 2000, 2000}, { 500,  500, 1000, 5000, 5000, 5000, 5000, 5000},
