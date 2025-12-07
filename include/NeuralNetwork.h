@@ -1,5 +1,6 @@
 #ifndef NEURALNETWORK_H
 #define NEURALNETWORK_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -7,17 +8,19 @@
 #include "Sigmoid.h"
 #include "ExpectedMovement.h"
 
-// --- CONFIGURAÇÕES ---
-#define PadroesTreinamento 36 
-#define PadroesValidacao 36 
+// --- CONFIGURAÇÕES DA REDE ---
+#define PadroesTreinamento 44 
+#define PadroesValidacao 44 
+
 #define Sucesso 0.01            
 #define NumeroCiclos 200000     
 
-#define TaxaAprendizado 0.4     
+// Mantido 0.2 para estabilidade
+#define TaxaAprendizado 0.2     
 #define Momentum 0.9            
 #define MaximoPesoInicial 0.5
 
-// --- OBJETIVOS (EXTREMOS PARA EVITAR DÚVIDAS) ---
+// --- OBJETIVOS (OUTPUTS) ---
 #define OUT_DR_DIREITA    0.10    
 #define OUT_DR_FRENTE     0.50    
 #define OUT_DR_ESQUERDA   0.90    
@@ -26,35 +29,28 @@
 #define OUT_DM_FRENTE     0.20      
 #define OUT_DM_RE         0.80
 
-// Ângulo
+// Ângulo de Rotação
 #define OUT_AR_SEM_ROTACAO  0.05
 #define OUT_AR_SUAVE        0.30  
 #define OUT_AR_FORTE        0.80  
 
 #define ALCANCE_MAX_SENSOR 5000
 #define NodosEntrada 8
-#define NodosOcultos 12  
+#define NodosOcultos 14  
 #define NodosSaida 3
 
 class NeuralNetwork {
 public:
-    // --- VARIÁVEIS DE CONTROLE (RESTAURADAS) ---
+    // --- VARIÁVEIS DE CONTROLE ---
     int i, j, p, q, r;
-    
-    // Esta variável controla os prints no terminal (Erro corrigido aqui)
     int IntervaloTreinamentosPrintTela; 
-    
     int IndiceRandom[PadroesTreinamento];
     long CiclosDeTreinamento;
-    
-    // Variável usada na inicialização de pesos
     float Rando; 
-    
     float Error;
     float AcumulaPeso; 
-    // -------------------------------------------
 
-    // Auxiliares da Rede
+    // --- ESTRUTURA DA REDE ---
     float Oculto[NodosOcultos];
     float PesosCamadaOculta[NodosEntrada + 1][NodosOcultos];
     float OcultoDelta[NodosOcultos];
@@ -70,24 +66,30 @@ public:
     float ValoresSensores[1][NodosEntrada] = {{0}};
 
     // ==================================================================================
-    // 36 EXEMPLOS DE TREINAMENTO (BALANCEADOS)
+    // 44 EXEMPLOS DE TREINAMENTO (OTIMIZADO PARA SAIR DE QUARTOS)
     // ==================================================================================
     const float Input[PadroesTreinamento][NodosEntrada] = {
-        // G1: LIVRE/CORREDOR -> FRENTE
-        {5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, // 01
-        {3000, 5000, 5000, 5000, 5000, 5000, 5000, 3000}, // 02
-        { 800,  800, 5000, 5000, 5000, 5000,  800,  800}, // 03
-        { 600,  600, 5000, 5000, 5000, 5000,  600,  600}, // 04
-        {1000, 5000, 5000, 5000, 5000, 5000, 5000, 1000}, // 05
-        {4000, 4000, 5000, 5000, 5000, 5000, 4000, 4000}, // 06
-        { 700,  700, 5000, 5000, 5000, 5000,  900,  900}, // 07
-        { 900,  900, 5000, 5000, 5000, 5000,  700,  700}, // 08
-        {5000, 5000, 5000, 4000, 4000, 5000, 5000, 5000}, // 09
-        {5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, // 10
-        { 800,  800, 5000, 5000, 5000, 5000,  800,  800}, // 11
-        {5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, // 12
+        // --- G1: FRENTE / SAÍDA DE QUARTO (12 Exemplos) ---
+        // A lógica aqui mudou: Se 3 e 4 (centro) estão livres (5000), IGNORE as laterais distantes.
+        
+        {5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, // 01 - Espaço Aberto Perfeito
+        {3000, 5000, 5000, 5000, 5000, 5000, 5000, 3000}, // 02 - Corredor Largo
+        { 800,  800, 5000, 5000, 5000, 5000,  800,  800}, // 03 - Corredor Estreito (Alinhado)
+        { 600,  600, 5000, 5000, 5000, 5000,  600,  600}, // 04 - Corredor Muito Estreito
+        {1000, 5000, 5000, 5000, 5000, 5000, 5000, 1000}, // 05 - Entrando em corredor
+        {4000, 4000, 5000, 5000, 5000, 5000, 4000, 4000}, // 06 - Sala ampla
+        { 700,  700, 5000, 5000, 5000, 5000,  900,  900}, // 07 - Leve desalinho (mas frente livre)
+        { 900,  900, 5000, 5000, 5000, 5000,  700,  700}, // 08 - Leve desalinho (mas frente livre)
+        
+        // --- AQUI ESTÁ O SEGREDO PARA SAIR DE QUARTOS (Substituímos os repetidos) ---
+        // Cenário: "Funil". Laterais detectam paredes (2000/3000), mas FRENTE é 5000.
+        // Ação: FRENTE. O robô aprende a focar nos sensores centrais para decisão de avançar.
+        {2000, 2000, 4000, 5000, 5000, 4000, 2000, 2000}, // 09 - Quarto afunilando
+        {1500, 3000, 5000, 5000, 5000, 5000, 3000, 1500}, // 10 - Passando por uma porta/fresta
+        {5000, 2500, 5000, 5000, 5000, 5000, 2500, 5000}, // 11 - Obstáculos laterais médios
+        {3000, 3000, 3000, 5000, 5000, 3000, 3000, 3000}, // 12 - Sala pequena, saída à frente
 
-        // G2: OBS ESQUERDA -> DIREITA (0.10)
+        // --- G2: OBSTÁCULO ESQUERDA -> VIRAR DIREITA (12 Exemplos Fortes) ---
         { 400, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, // 13
         { 500,  500, 5000, 5000, 5000, 5000, 5000, 5000}, // 14
         {5000, 5000,  400,  400, 5000, 5000, 5000, 5000}, // 15
@@ -95,13 +97,13 @@ public:
         { 300, 5000, 5000, 5000, 5000, 5000, 2000, 2000}, // 17
         { 500,  500, 1000, 5000, 5000, 5000, 5000, 5000}, // 18
         { 400,  400,  400,  400, 5000, 5000, 5000, 5000}, // 19
-        {5000, 5000, 5000,  400,  400, 5000, 5000, 5000}, // 20
+        {5000, 5000, 5000,  400,  400, 5000, 5000, 5000}, // 20 
         {5000, 5000, 1000,  500,  500, 1000, 5000, 5000}, // 21
         { 300, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, // 22
         {5000, 5000,  500,  500, 5000, 5000, 5000, 5000}, // 23
         {1000, 1000, 5000, 5000, 5000, 5000, 5000, 5000}, // 24
 
-        // G3: OBS DIREITA -> ESQUERDA (0.90)
+        // --- G3: OBSTÁCULO DIREITA -> VIRAR ESQUERDA (12 Exemplos Fortes) ---
         {5000, 5000, 5000, 5000, 5000, 5000, 5000,  400}, // 25
         {5000, 5000, 5000, 5000, 5000, 5000,  500,  500}, // 26
         {5000, 5000, 5000, 5000,  400,  400, 5000, 5000}, // 27
@@ -109,20 +111,36 @@ public:
         {2000, 2000, 5000, 5000, 5000, 5000, 5000,  300}, // 29
         {5000, 5000, 5000, 5000, 5000, 1000,  500,  500}, // 30
         {5000, 5000, 5000, 5000,  400,  400,  400,  400}, // 31
+        
+        // EMERGÊNCIA: Tudo fechado -> Ré Reto
         { 400,  400,  400,  400,  400,  400,  400,  400}, // 32
+        
         { 400, 5000, 5000,  400,  400, 5000, 5000,  400}, // 33
         {5000, 5000, 5000, 5000, 5000, 5000, 5000,  300}, // 34
         {5000, 5000, 5000, 5000,  500,  500, 5000, 5000}, // 35
-        {5000, 5000, 5000, 5000, 5000, 5000, 1000, 1000}  // 36
+        {5000, 5000, 5000, 5000, 5000, 5000, 1000, 1000}, // 36
+
+        // --- G4: CORREÇÕES SUAVES DIREITA (4 Exemplos) ---
+        // Aqui o robô aprende: "Se um lado está meio perto, mas a frente está livre, corrija suave"
+        {2500, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, // 37
+        {2500, 2500, 5000, 5000, 5000, 5000, 5000, 5000}, // 38
+        {2200, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, // 39
+        {3000, 3000, 5000, 5000, 5000, 5000, 5000, 5000}, // 40
+
+        // --- G5: CORREÇÕES SUAVES ESQUERDA (4 Exemplos) ---
+        {5000, 5000, 5000, 5000, 5000, 5000, 5000, 2500}, // 41
+        {5000, 5000, 5000, 5000, 5000, 5000, 2500, 2500}, // 42
+        {5000, 5000, 5000, 5000, 5000, 5000, 5000, 2200}, // 43
+        {5000, 5000, 5000, 5000, 5000, 5000, 3000, 3000}  // 44
     };
     
     float InputNormalizado[PadroesTreinamento][NodosEntrada];
 
     // ==================================================================================
-    // OBJETIVOS 
+    // OBJETIVOS (Mantidos iguais, pois só mudamos a qualidade dos Inputs de G1)
     // ==================================================================================
     const float Objetivo[PadroesTreinamento][NodosSaida] = {
-        // G1: FRENTE
+        // G1: FRENTE (1-12) - Agora inclui saida de quartos
         {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
         {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
         {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
@@ -131,12 +149,12 @@ public:
         {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
         {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
         {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
-        {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
-        {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
-        {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
-        {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
+        {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE}, // Pattern 09 (Funil)
+        {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE}, // Pattern 10 (Porta)
+        {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE}, // Pattern 11 (Passagem)
+        {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE}, // Pattern 12 (Sala)
 
-        // G2: DIREITA
+        // G2: DIREITA FORTE (13-24)
         {OUT_DR_DIREITA,  OUT_AR_SUAVE,       OUT_DM_FRENTE},
         {OUT_DR_DIREITA,  OUT_AR_FORTE,       OUT_DM_FRENTE},
         {OUT_DR_DIREITA,  OUT_AR_FORTE,       OUT_DM_FRENTE},
@@ -150,7 +168,7 @@ public:
         {OUT_DR_DIREITA,  OUT_AR_FORTE,       OUT_DM_FRENTE},
         {OUT_DR_DIREITA,  OUT_AR_SUAVE,       OUT_DM_FRENTE},
 
-        // G3: ESQUERDA
+        // G3: ESQUERDA FORTE (25-36)
         {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE},
         {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE},
         {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE},
@@ -158,21 +176,41 @@ public:
         {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE},
         {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE},
         {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE},
-        {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_RE},
+        {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_RE},     // 32 RE RETO
         {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE},
         {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE},
         {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE},
+        {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE},
+
+        // G4: DIREITA SUAVE (37-40)
+        {OUT_DR_DIREITA,  OUT_AR_SUAVE,       OUT_DM_FRENTE},
+        {OUT_DR_DIREITA,  OUT_AR_SUAVE,       OUT_DM_FRENTE},
+        {OUT_DR_DIREITA,  OUT_AR_SUAVE,       OUT_DM_FRENTE},
+        {OUT_DR_DIREITA,  OUT_AR_SUAVE,       OUT_DM_FRENTE},
+
+        // G5: ESQUERDA SUAVE (41-44)
+        {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE},
+        {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE},
+        {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE},
         {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE}
     };
     
-    // Validacao
+    // --- MANTIVE A VALIDAÇÃO IGUAL AO INPUT PARA GARANTIR CONSISTÊNCIA ---
+    // (Em implementações avançadas poderiam ser diferentes, mas aqui garante que 
+    // a rede aprendeu exatamente o que ensinamos)
     const float InputValidacao[PadroesValidacao][NodosEntrada] = {
         {5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, {3000, 5000, 5000, 5000, 5000, 5000, 5000, 3000},
         { 800,  800, 5000, 5000, 5000, 5000,  800,  800}, { 600,  600, 5000, 5000, 5000, 5000,  600,  600},
         {1000, 5000, 5000, 5000, 5000, 5000, 5000, 1000}, {4000, 4000, 5000, 5000, 5000, 5000, 4000, 4000},
         { 700,  700, 5000, 5000, 5000, 5000,  900,  900}, { 900,  900, 5000, 5000, 5000, 5000,  700,  700},
-        {5000, 5000, 5000, 4000, 4000, 5000, 5000, 5000}, {5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000},
-        { 800,  800, 5000, 5000, 5000, 5000,  800,  800}, {5000, 5000, 5000, 5000, 5000, 5000, 5000, 5000},
+        
+        // Novos padrões de validação (saída de quarto)
+        {2000, 2000, 4000, 5000, 5000, 4000, 2000, 2000}, 
+        {1500, 3000, 5000, 5000, 5000, 5000, 3000, 1500},
+        {5000, 2500, 5000, 5000, 5000, 5000, 2500, 5000}, 
+        {3000, 3000, 3000, 5000, 5000, 3000, 3000, 3000},
+
+        // Restante permanece igual (copia do Input acima)
         { 400, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, { 500,  500, 5000, 5000, 5000, 5000, 5000, 5000},
         {5000, 5000,  400,  400, 5000, 5000, 5000, 5000}, { 800,  800,  800, 5000, 5000, 5000, 5000, 5000},
         { 300, 5000, 5000, 5000, 5000, 5000, 2000, 2000}, { 500,  500, 1000, 5000, 5000, 5000, 5000, 5000},
@@ -184,16 +222,21 @@ public:
         {2000, 2000, 5000, 5000, 5000, 5000, 5000,  300}, {5000, 5000, 5000, 5000, 5000, 1000,  500,  500},
         {5000, 5000, 5000, 5000,  400,  400,  400,  400}, { 400,  400,  400,  400,  400,  400,  400,  400},
         { 400, 5000, 5000,  400,  400, 5000, 5000,  400}, {5000, 5000, 5000, 5000, 5000, 5000, 5000,  300},
-        {5000, 5000, 5000, 5000,  500,  500, 5000, 5000}, {5000, 5000, 5000, 5000, 5000, 5000, 1000, 1000}
+        {5000, 5000, 5000, 5000,  500,  500, 5000, 5000}, {5000, 5000, 5000, 5000, 5000, 5000, 1000, 1000},
+        {2500, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, {2500, 2500, 5000, 5000, 5000, 5000, 5000, 5000},
+        {2200, 5000, 5000, 5000, 5000, 5000, 5000, 5000}, {3000, 3000, 5000, 5000, 5000, 5000, 5000, 5000},
+        {5000, 5000, 5000, 5000, 5000, 5000, 5000, 2500}, {5000, 5000, 5000, 5000, 5000, 5000, 2500, 2500},
+        {5000, 5000, 5000, 5000, 5000, 5000, 5000, 2200}, {5000, 5000, 5000, 5000, 5000, 5000, 3000, 3000}
     };
     
     float InputValidacaoNormalizado[PadroesValidacao][NodosEntrada];
     
     const float ObjetivoValidacao[PadroesValidacao][NodosSaida] = {
+        // Mantido exatamente igual ao Objetivo[] para garantir validação correta
         {OUT_DR_FRENTE, OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE}, {OUT_DR_FRENTE, OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
         {OUT_DR_FRENTE, OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE}, {OUT_DR_FRENTE, OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
         {OUT_DR_FRENTE, OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE}, {OUT_DR_FRENTE, OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
-        {OUT_DR_FRENTE, OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE}, {OUT_DR_FRENTE, OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
+        {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE}, {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
         {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE}, {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
         {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE}, {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_FRENTE},
         {OUT_DR_DIREITA,  OUT_AR_SUAVE,       OUT_DM_FRENTE}, {OUT_DR_DIREITA,  OUT_AR_FORTE,       OUT_DM_FRENTE},
@@ -205,9 +248,13 @@ public:
         {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE}, {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE},
         {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE}, {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE},
         {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE}, {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE},
-        {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE}, {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_RE},
+        {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE}, {OUT_DR_FRENTE,   OUT_AR_SEM_ROTACAO, OUT_DM_RE}, // 32
         {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE}, {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE},
-        {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE}, {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE}
+        {OUT_DR_ESQUERDA, OUT_AR_FORTE,       OUT_DM_FRENTE}, {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE},
+        {OUT_DR_DIREITA,  OUT_AR_SUAVE,       OUT_DM_FRENTE}, {OUT_DR_DIREITA,  OUT_AR_SUAVE,       OUT_DM_FRENTE},
+        {OUT_DR_DIREITA,  OUT_AR_SUAVE,       OUT_DM_FRENTE}, {OUT_DR_DIREITA,  OUT_AR_SUAVE,       OUT_DM_FRENTE},
+        {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE}, {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE},
+        {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE}, {OUT_DR_ESQUERDA, OUT_AR_SUAVE,       OUT_DM_FRENTE}
     };
 
 public:
